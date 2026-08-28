@@ -1,57 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 
-// Points at the Vite dev proxy (see vite.config.js), which forwards to the
-// Java backend on http://localhost:4567. Change this if you deploy the
-// backend elsewhere.
+// Both endpoints go through the Vite dev proxy (see vite.config.js), which
+// forwards to the Java backend on http://localhost:4567. Change these if you
+// deploy the backend elsewhere.
 const API_URL = '/api/ask'
-
-// No-API-key YouTube search through public Piped / Invidious instances. We
-// try them in order and keep the first usable video result. Public instances
-// come and go, which is why there is a list rather than a single URL.
-const VIDEO_SEARCH_BACKENDS = [
-  {
-    search: (q) =>
-        `https://pipedapi.kavin.rocks/search?q=${encodeURIComponent(q)}&filter=videos`,
-    parse: parsePiped,
-  },
-  {
-    search: (q) =>
-        `https://pipedapi.adminforge.de/search?q=${encodeURIComponent(q)}&filter=videos`,
-    parse: parsePiped,
-  },
-  {
-    search: (q) =>
-        `https://inv.nadeko.net/api/v1/search?q=${encodeURIComponent(q)}&type=video`,
-    parse: parseInvidious,
-  },
-  {
-    search: (q) =>
-        `https://invidious.jing.rocks/api/v1/search?q=${encodeURIComponent(q)}&type=video`,
-    parse: parseInvidious,
-  },
-]
-
-function parsePiped(data) {
-  const item = (data?.items || []).find(
-      (i) => typeof i.url === 'string' && i.url.includes('v='),
-  )
-  if (!item) return null
-  return {
-    id: new URLSearchParams(item.url.split('?')[1]).get('v'),
-    title: item.title || '',
-    author: item.uploaderName || 'Desconocido',
-  }
-}
-
-function parseInvidious(data) {
-  const item = (Array.isArray(data) ? data : []).find((i) => i.videoId)
-  if (!item) return null
-  return {
-    id: item.videoId,
-    title: item.title || '',
-    author: item.author || 'Desconocido',
-  }
-}
+// GET /api/video?q=... -> { videoId, title, author }. The backend does the
+// YouTube search (no API key) so the browser never hits CORS or a flaky
+// public search instance.
+const VIDEO_API_URL = '/api/video'
 
 // Simple recreation of Claude's sunburst mark, drawn as inline SVG in
 // Anthropic's brand clay/orange (#D97757) since we can't fetch or embed
@@ -104,9 +60,8 @@ function loadYouTubeIframeApi() {
 }
 
 // Renders a YouTube player inside the frame plus Play / Pause / Stop buttons
-// that drive it through the IFrame Player API. Pass a `videoId` for a known
-// video, or a `searchQuery` to let the player load the first search result.
-function YouTubePlayer({ videoId, searchQuery }) {
+// that drive it through the IFrame Player API.
+function YouTubePlayer({ videoId }) {
   const containerRef = useRef(null)
   const playerRef = useRef(null)
   const [ready, setReady] = useState(false)
@@ -124,12 +79,8 @@ function YouTubePlayer({ videoId, searchQuery }) {
         .then((YT) => {
           if (cancelled) return
           playerRef.current = new YT.Player(host, {
-            videoId: videoId || undefined,
-            playerVars: {
-              rel: 0,
-              modestbranding: 1,
-              ...(videoId ? {} : { listType: 'search', list: searchQuery }),
-            },
+            videoId,
+            playerVars: { rel: 0, modestbranding: 1 },
             events: {
               onReady: () => {
                 if (!cancelled) setReady(true)
@@ -149,7 +100,7 @@ function YouTubePlayer({ videoId, searchQuery }) {
       playerRef.current = null
       if (containerRef.current) containerRef.current.innerHTML = ''
     }
-  }, [videoId, searchQuery])
+  }, [videoId])
 
   function control(method) {
     try {
@@ -200,7 +151,7 @@ export default function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const [video, setVideo] = useState(null) // { id, searchQuery, title, author }
+  const [video, setVideo] = useState(null) // { id, title, author }
   const [videoLoading, setVideoLoading] = useState(false)
   const [videoError, setVideoError] = useState('')
 
@@ -235,33 +186,26 @@ export default function App() {
     setVideoError('')
     setVideo(null)
 
-    let found = null
-    for (const backend of VIDEO_SEARCH_BACKENDS) {
-      try {
-        const response = await fetch(backend.search(trimmedQuestion))
-        if (!response.ok) continue
-        const parsed = backend.parse(await response.json())
-        if (parsed?.id) {
-          found = parsed
-          break
-        }
-      } catch {
-        // instance unreachable / CORS / bad payload — try the next one
-      }
-    }
+    try {
+      const response = await fetch(
+          `${VIDEO_API_URL}?q=${encodeURIComponent(trimmedQuestion)}`,
+      )
+      const data = await response.json()
 
-    if (found) {
-      setVideo(found)
-    } else {
-      // Last resort: let the embedded player run the search itself.
+      if (!response.ok || !data.videoId) {
+        throw new Error(data.error || `Request failed (${response.status})`)
+      }
+
       setVideo({
-        id: null,
-        searchQuery: trimmedQuestion,
-        title: `Resultados de YouTube para "${trimmedQuestion}"`,
-        author: 'YouTube',
+        id: data.videoId,
+        title: data.title || trimmedQuestion,
+        author: data.author || 'YouTube',
       })
+    } catch (err) {
+      setVideoError('No se pudo cargar un video para esta pregunta.')
+    } finally {
+      setVideoLoading(false)
     }
-    setVideoLoading(false)
   }
 
   function handleSubmit(e) {
@@ -354,11 +298,7 @@ export default function App() {
               )}
 
               {!videoLoading && !videoError && video && (
-                  <YouTubePlayer
-                      key={video.id || video.searchQuery}
-                      videoId={video.id}
-                      searchQuery={video.searchQuery}
-                  />
+                  <YouTubePlayer key={video.id} videoId={video.id} />
               )}
 
               {!videoLoading && !videoError && !video && (
@@ -372,11 +312,7 @@ export default function App() {
               {video && !videoLoading && !videoError && (
                   <a
                       className="console__image-credit"
-                      href={
-                        video.id
-                            ? `https://www.youtube.com/watch?v=${video.id}`
-                            : `https://www.youtube.com/results?search_query=${encodeURIComponent(video.searchQuery)}`
-                      }
+                      href={`https://www.youtube.com/watch?v=${video.id}`}
                       target="_blank"
                       rel="noreferrer"
                   >
