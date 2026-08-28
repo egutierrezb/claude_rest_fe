@@ -1,0 +1,317 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
+
+:root {
+  --ink: #14161c;
+  --ink-panel: #1c1f28;
+  --ink-line: #2c2f3a;
+  --paper: #f4f2ec;
+  --amber: #e8a33d;
+  --amber-dim: #b97f2c;
+  --error: #e8663d;
+  --text-soft: #9a9ead;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--ink);
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  color: var(--paper);
+}
+
+.page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  background:
+          radial-gradient(circle at 15% 10%, rgba(232, 163, 61, 0.08), transparent 40%),
+          var(--ink);
+}
+
+.console {
+  width: 100%;
+  max-width: 640px;
+  background: var(--ink-panel);
+  border: 1px solid var(--ink-line);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 30px 60px -25px rgba(0, 0, 0, 0.6);
+}
+
+.console__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--ink-line);
+  background: #191c24;
+}
+
+.console__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--ink-line);
+}
+
+.console__dot:nth-child(1) { background: #e85c4a; }
+.console__dot:nth-child(2) { background: #e8b03d; }
+.console__dot:nth-child(3) { background: #4ec98a; }
+
+.console__title {
+  margin: 0 0 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-soft);
+}
+
+.console__form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 24px 24px 8px;
+}
+
+.console__output-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.console__body {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 20px;
+  padding: 16px 24px 28px;
+}
+
+@media (max-width: 620px) {
+  .console__body {
+    grid-template-columns: 1fr;
+  }
+}
+
+.console__label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--amber);
+}
+
+.console__label--with-icon {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.console__logo {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.console__input {
+  resize: vertical;
+  min-height: 64px;
+  background: #10121a;
+  border: 1px solid var(--ink-line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  color: var(--paper);
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  transition: border-color 0.15s ease;
+}
+
+.console__input:focus {
+  outline: none;
+  border-color: var(--amber-dim);
+}
+
+.console__input::placeholder {
+  color: #565b6b;
+}
+
+.console__button {
+  align-self: flex-end;
+  margin-top: 4px;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  background: var(--amber);
+  color: #1a1206;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.05s ease;
+}
+
+.console__button:hover:not(:disabled) {
+  background: #f0b158;
+}
+
+.console__button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.console__button:disabled {
+  background: var(--ink-line);
+  color: var(--text-soft);
+  cursor: not-allowed;
+}
+
+.console__output {
+  resize: vertical;
+  min-height: 180px;
+  width: 100%;
+  background: #0e1016;
+  border: 1px solid var(--ink-line);
+  border-radius: 8px;
+  padding: 14px 16px;
+  color: var(--paper);
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', monospace;
+  font-size: 13.5px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  cursor: text;
+}
+
+.console__output[data-state='empty'] {
+  color: #565b6b;
+  font-style: italic;
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+}
+
+.console__output[data-state='loading'] {
+  color: var(--amber);
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+}
+
+.console__output[data-state='error'] {
+  color: var(--error);
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+}
+
+.console__output:focus {
+  outline: none;
+  border-color: var(--ink-line);
+}
+
+.console__output-wrap {
+  position: relative;
+}
+
+.console__loading-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-radius: 8px;
+  background: #0e1016;
+  border: 1px solid var(--ink-line);
+  color: var(--amber);
+  font-size: 13.5px;
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  pointer-events: none;
+}
+
+.spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid rgba(232, 163, 61, 0.25);
+  border-top-color: var(--amber);
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+.spinner--button {
+  width: 13px;
+  height: 13px;
+  border-width: 2px;
+  border-color: rgba(26, 18, 6, 0.3);
+  border-top-color: #1a1206;
+  margin-right: 2px;
+  vertical-align: -2px;
+  display: inline-block;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.console__image-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.console__image-frame {
+  position: relative;
+  border: 1px solid var(--ink-line);
+  border-radius: 8px;
+  background: #0e1016;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.console__image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.console__image-placeholder {
+  padding: 16px;
+  text-align: center;
+  font-size: 13px;
+  color: #565b6b;
+  font-style: italic;
+}
+
+.console__image-placeholder--error {
+  color: var(--error);
+  font-style: normal;
+}
+
+.console__image-credit {
+  font-size: 11px;
+  color: var(--text-soft);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.console__image-credit:hover {
+  color: var(--amber);
+  text-decoration: underline;
+}
