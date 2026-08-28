@@ -263,30 +263,60 @@ body {
   }
 }
 
-.console__image-block {
+.console__video-block {
   display: flex;
   flex-direction: column;
   gap: 8px;
   min-width: 0;
 }
 
-.console__image-frame {
+.console__video-frame {
   position: relative;
   border: 1px solid var(--ink-line);
   border-radius: 8px;
   background: #0e1016;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 16 / 9;
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.console__image {
+.console__video-embed,
+.console__video-embed iframe {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  border: 0;
   display: block;
+}
+
+.console__video-controls {
+  display: flex;
+  gap: 6px;
+}
+
+.console__video-btn {
+  flex: 1;
+  padding: 7px 8px;
+  border: 1px solid var(--ink-line);
+  border-radius: 6px;
+  background: #10121a;
+  color: var(--paper);
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', monospace;
+  font-size: 11.5px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.console__video-btn:hover:not(:disabled) {
+  border-color: var(--amber-dim);
+  background: #161922;
+}
+
+.console__video-btn:disabled {
+  color: var(--text-soft);
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .console__image-placeholder {

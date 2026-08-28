@@ -1,13 +1,57 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 // Points at the Vite dev proxy (see vite.config.js), which forwards to the
 // Java backend on http://localhost:4567. Change this if you deploy the
 // backend elsewhere.
 const API_URL = '/api/ask'
 
-// Free, no-API-key-needed search of Creative Commons / public domain images.
-// https://api.openverse.org/v1/images/
-const IMAGE_SEARCH_URL = 'https://api.openverse.org/v1/images/'
+// No-API-key YouTube search through public Piped / Invidious instances. We
+// try them in order and keep the first usable video result. Public instances
+// come and go, which is why there is a list rather than a single URL.
+const VIDEO_SEARCH_BACKENDS = [
+  {
+    search: (q) =>
+        `https://pipedapi.kavin.rocks/search?q=${encodeURIComponent(q)}&filter=videos`,
+    parse: parsePiped,
+  },
+  {
+    search: (q) =>
+        `https://pipedapi.adminforge.de/search?q=${encodeURIComponent(q)}&filter=videos`,
+    parse: parsePiped,
+  },
+  {
+    search: (q) =>
+        `https://inv.nadeko.net/api/v1/search?q=${encodeURIComponent(q)}&type=video`,
+    parse: parseInvidious,
+  },
+  {
+    search: (q) =>
+        `https://invidious.jing.rocks/api/v1/search?q=${encodeURIComponent(q)}&type=video`,
+    parse: parseInvidious,
+  },
+]
+
+function parsePiped(data) {
+  const item = (data?.items || []).find(
+      (i) => typeof i.url === 'string' && i.url.includes('v='),
+  )
+  if (!item) return null
+  return {
+    id: new URLSearchParams(item.url.split('?')[1]).get('v'),
+    title: item.title || '',
+    author: item.uploaderName || 'Desconocido',
+  }
+}
+
+function parseInvidious(data) {
+  const item = (Array.isArray(data) ? data : []).find((i) => i.videoId)
+  if (!item) return null
+  return {
+    id: item.videoId,
+    title: item.title || '',
+    author: item.author || 'Desconocido',
+  }
+}
 
 // Simple recreation of Claude's sunburst mark, drawn as inline SVG in
 // Anthropic's brand clay/orange (#D97757) since we can't fetch or embed
@@ -38,15 +82,127 @@ function ClaudeLogo({ className }) {
   )
 }
 
+// Loads the YouTube IFrame Player API <script> exactly once and resolves
+// with window.YT when it is ready to use.
+let ytApiPromise = null
+function loadYouTubeIframeApi() {
+  if (typeof window === 'undefined') return Promise.reject(new Error('no window'))
+  if (window.YT?.Player) return Promise.resolve(window.YT)
+  if (ytApiPromise) return ytApiPromise
+
+  ytApiPromise = new Promise((resolve) => {
+    const previous = window.onYouTubeIframeAPIReady
+    window.onYouTubeIframeAPIReady = () => {
+      if (typeof previous === 'function') previous()
+      resolve(window.YT)
+    }
+    const tag = document.createElement('script')
+    tag.src = 'https://www.youtube.com/iframe_api'
+    document.head.appendChild(tag)
+  })
+  return ytApiPromise
+}
+
+// Renders a YouTube player inside the frame plus Play / Pause / Stop buttons
+// that drive it through the IFrame Player API. Pass a `videoId` for a known
+// video, or a `searchQuery` to let the player load the first search result.
+function YouTubePlayer({ videoId, searchQuery }) {
+  const containerRef = useRef(null)
+  const playerRef = useRef(null)
+  const [ready, setReady] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    setReady(false)
+
+    // YT.Player replaces the element we hand it with an <iframe>, so give it
+    // a throwaway child and never let it touch React's own container node.
+    const host = document.createElement('div')
+    containerRef.current?.appendChild(host)
+
+    loadYouTubeIframeApi()
+        .then((YT) => {
+          if (cancelled) return
+          playerRef.current = new YT.Player(host, {
+            videoId: videoId || undefined,
+            playerVars: {
+              rel: 0,
+              modestbranding: 1,
+              ...(videoId ? {} : { listType: 'search', list: searchQuery }),
+            },
+            events: {
+              onReady: () => {
+                if (!cancelled) setReady(true)
+              },
+            },
+          })
+        })
+        .catch(() => {})
+
+    return () => {
+      cancelled = true
+      try {
+        playerRef.current?.destroy?.()
+      } catch {
+        // player may already be gone
+      }
+      playerRef.current = null
+      if (containerRef.current) containerRef.current.innerHTML = ''
+    }
+  }, [videoId, searchQuery])
+
+  function control(method) {
+    try {
+      playerRef.current?.[method]?.()
+    } catch {
+      // ignore: player not ready yet or a transient cross-origin hiccup
+    }
+  }
+
+  return (
+      <>
+        <div className="console__video-frame">
+          <div ref={containerRef} className="console__video-embed" />
+        </div>
+        <div className="console__video-controls">
+          <button
+              type="button"
+              className="console__video-btn"
+              onClick={() => control('playVideo')}
+              disabled={!ready}
+          >
+            ▶ Reproducir
+          </button>
+          <button
+              type="button"
+              className="console__video-btn"
+              onClick={() => control('pauseVideo')}
+              disabled={!ready}
+          >
+            ⏸ Pausar
+          </button>
+          <button
+              type="button"
+              className="console__video-btn"
+              onClick={() => control('stopVideo')}
+              disabled={!ready}
+          >
+            ⏹ Detener
+          </button>
+        </div>
+      </>
+  )
+}
+
 export default function App() {
   const [question, setQuestion] = useState('')
   const [answer, setAnswer] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const [image, setImage] = useState(null) // { url, title, creator, sourceUrl }
-  const [imageLoading, setImageLoading] = useState(false)
-  const [imageError, setImageError] = useState('')
+  const [video, setVideo] = useState(null) // { id, searchQuery, title, author }
+  const [videoLoading, setVideoLoading] = useState(false)
+  const [videoError, setVideoError] = useState('')
 
   async function fetchAnswer(trimmedQuestion) {
     setLoading(true)
@@ -74,38 +230,38 @@ export default function App() {
     }
   }
 
-  async function fetchImage(trimmedQuestion) {
-    setImageLoading(true)
-    setImageError('')
-    setImage(null)
+  async function fetchVideo(trimmedQuestion) {
+    setVideoLoading(true)
+    setVideoError('')
+    setVideo(null)
 
-    try {
-      const url = `${IMAGE_SEARCH_URL}?q=${encodeURIComponent(trimmedQuestion)}&page_size=1`
-      const response = await fetch(url)
-
-      if (!response.ok) {
-        throw new Error(`Image search failed (${response.status})`)
+    let found = null
+    for (const backend of VIDEO_SEARCH_BACKENDS) {
+      try {
+        const response = await fetch(backend.search(trimmedQuestion))
+        if (!response.ok) continue
+        const parsed = backend.parse(await response.json())
+        if (parsed?.id) {
+          found = parsed
+          break
+        }
+      } catch {
+        // instance unreachable / CORS / bad payload — try the next one
       }
-
-      const data = await response.json()
-      const result = data.results && data.results[0]
-
-      if (!result) {
-        setImageError('No se encontró una imagen para esta pregunta.')
-        return
-      }
-
-      setImage({
-        url: result.thumbnail || result.url,
-        title: result.title || trimmedQuestion,
-        creator: result.creator || 'Desconocido',
-        sourceUrl: result.foreign_landing_url || result.url,
-      })
-    } catch (err) {
-      setImageError('No se pudo cargar una imagen para esta pregunta.')
-    } finally {
-      setImageLoading(false)
     }
+
+    if (found) {
+      setVideo(found)
+    } else {
+      // Last resort: let the embedded player run the search itself.
+      setVideo({
+        id: null,
+        searchQuery: trimmedQuestion,
+        title: `Resultados de YouTube para "${trimmedQuestion}"`,
+        author: 'YouTube',
+      })
+    }
+    setVideoLoading(false)
   }
 
   function handleSubmit(e) {
@@ -113,10 +269,10 @@ export default function App() {
     const trimmed = question.trim()
     if (!trimmed || loading) return
 
-    // Fired independently: a slow/failed image lookup never blocks or
+    // Fired independently: a slow/failed video lookup never blocks or
     // breaks the actual Claude answer.
     fetchAnswer(trimmed)
-    fetchImage(trimmed)
+    fetchVideo(trimmed)
   }
 
   return (
@@ -178,36 +334,53 @@ export default function App() {
               </div>
             </div>
 
-            <div className="console__image-block">
-              <span className="console__label">Imagen relacionada</span>
-              <div className="console__image-frame">
-                {imageLoading && (
+            <div className="console__video-block">
+              <span className="console__label">Video relacionado</span>
+
+              {videoLoading && (
+                  <div className="console__video-frame">
                     <div className="console__image-placeholder">
                       <span className="spinner" aria-hidden="true" />
                     </div>
-                )}
-                {!imageLoading && imageError && (
+                  </div>
+              )}
+
+              {!videoLoading && videoError && (
+                  <div className="console__video-frame">
                     <div className="console__image-placeholder console__image-placeholder--error">
-                      {imageError}
+                      {videoError}
                     </div>
-                )}
-                {!imageLoading && !imageError && image && (
-                    <img className="console__image" src={image.url} alt={image.title} />
-                )}
-                {!imageLoading && !imageError && !image && (
+                  </div>
+              )}
+
+              {!videoLoading && !videoError && video && (
+                  <YouTubePlayer
+                      key={video.id || video.searchQuery}
+                      videoId={video.id}
+                      searchQuery={video.searchQuery}
+                  />
+              )}
+
+              {!videoLoading && !videoError && !video && (
+                  <div className="console__video-frame">
                     <div className="console__image-placeholder">
-                      La imagen aparecerá aquí.
+                      El video aparecerá aquí.
                     </div>
-                )}
-              </div>
-              {image && !imageLoading && !imageError && (
+                  </div>
+              )}
+
+              {video && !videoLoading && !videoError && (
                   <a
                       className="console__image-credit"
-                      href={image.sourceUrl}
+                      href={
+                        video.id
+                            ? `https://www.youtube.com/watch?v=${video.id}`
+                            : `https://www.youtube.com/results?search_query=${encodeURIComponent(video.searchQuery)}`
+                      }
                       target="_blank"
                       rel="noreferrer"
                   >
-                    {image.title} — {image.creator}
+                    {video.title} — {video.author}
                   </a>
               )}
             </div>
