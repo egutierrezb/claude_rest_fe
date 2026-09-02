@@ -40,7 +40,10 @@ body {
 
 .console {
   width: 100%;
-  max-width: 640px;
+  /* 1064 = two 498px columns + 20px gap + 48px body padding. 498px is double the
+     249px the video used to get from the old 640px shell, so the 16/9 frame goes
+     from ~249x140 to ~498x280. */
+  max-width: 1064px;
   background: var(--ink-panel);
   border: 1px solid var(--ink-line);
   border-radius: 14px;
@@ -91,12 +94,15 @@ body {
 
 .console__body {
   display: grid;
-  grid-template-columns: 1.3fr 1fr;
+  /* Equal columns so the answer box and the video frame are the same width. */
+  grid-template-columns: 1fr 1fr;
   gap: 20px;
   padding: 16px 24px 28px;
 }
 
-@media (max-width: 620px) {
+/* Collapse to one column before the two columns get too narrow to be useful.
+   Raised from 620px to match the wider shell above. */
+@media (max-width: 900px) {
   .console__body {
     grid-template-columns: 1fr;
   }
@@ -122,6 +128,13 @@ body {
   flex-shrink: 0;
 }
 
+.console__youtube-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--amber);
+}
+
 .console__input {
   resize: vertical;
   min-height: 64px;
@@ -145,9 +158,71 @@ body {
   color: #565b6b;
 }
 
+/* Question builder: [ prefix ] [ model input ] [ count ] [ suffix ] on one line. */
+.console__q-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  background: #10121a;
+  border: 1px solid var(--ink-line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  transition: border-color 0.15s ease;
+}
+
+.console__q-row:focus-within {
+  border-color: var(--amber-dim);
+}
+
+.console__q-fixed {
+  color: var(--text-soft);
+  font-size: 14px;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.console__q-input {
+  flex: 1 1 160px;
+  min-width: 120px;
+  background: transparent;
+  border: none;
+  color: var(--paper);
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 15px;
+  padding: 2px 0;
+}
+
+.console__q-input:focus {
+  outline: none;
+}
+
+.console__q-input::placeholder {
+  color: #565b6b;
+}
+
+.console__q-count {
+  background: #0e1016;
+  border: 1px solid var(--ink-line);
+  border-radius: 6px;
+  color: var(--paper);
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', monospace;
+  font-size: 13px;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
+.console__q-count:focus {
+  outline: none;
+  border-color: var(--amber-dim);
+}
+
 .console__button {
   align-self: flex-end;
   margin-top: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   padding: 10px 20px;
   border: none;
   border-radius: 8px;
@@ -157,6 +232,12 @@ body {
   font-size: 14px;
   cursor: pointer;
   transition: background 0.15s ease, transform 0.05s ease;
+}
+
+.console__button-icon {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
 }
 
 .console__button:hover:not(:disabled) {
@@ -175,7 +256,10 @@ body {
 
 .console__output {
   resize: vertical;
-  min-height: 180px;
+  /* Match the video frame exactly: same column width, same 16/9 ratio. height:auto
+     is required so the ratio drives the height instead of the textarea's rows. */
+  aspect-ratio: 16 / 9;
+  height: auto;
   width: 100%;
   background: #0e1016;
   border: 1px solid var(--ink-line);
@@ -247,7 +331,6 @@ body {
   border-width: 2px;
   border-color: rgba(26, 18, 6, 0.3);
   border-top-color: #1a1206;
-  margin-right: 2px;
   vertical-align: -2px;
   display: inline-block;
 }
@@ -293,31 +376,100 @@ body {
 
 .console__video-controls {
   display: flex;
-  gap: 6px;
+  justify-content: center;
+  padding-top: 4px;
 }
 
-.console__video-btn {
-  flex: 1;
-  padding: 7px 8px;
-  border: 1px solid var(--ink-line);
-  border-radius: 6px;
-  background: #10121a;
-  color: var(--paper);
-  font-family: 'IBM Plex Mono', 'SFMono-Regular', monospace;
-  font-size: 11.5px;
+/* Play/pause morph button.
+   Two bars, each clipped to one half of the play triangle; toggling animates the
+   flex gap to zero and the clip paths to full rectangles, so pause folds into
+   play along a single interpolated path. No JS, no SVG, no icon font — the
+   checkbox carries the state, which keeps keyboard and focus semantics native.
+   Adapted from the source demo: morph mechanics and class contract are intact;
+   the full-page stage, demo track card and green accent are dropped so it sits
+   in this console's amber palette. */
+.pp-01__chk {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  clip-path: inset(50%);
+}
+
+.pp-01__btn {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--amber);
+  color: #1a1206;
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: transform 0.28s cubic-bezier(0.34, 1.4, 0.5, 1), box-shadow 0.28s, background 0.28s;
 }
 
-.console__video-btn:hover:not(:disabled) {
-  border-color: var(--amber-dim);
-  background: #161922;
+.pp-01__btn:hover {
+  transform: scale(1.06);
 }
 
-.console__video-btn:disabled {
-  color: var(--text-soft);
+.pp-01__btn:active {
+  transform: scale(0.95);
+}
+
+.pp-01__chk:focus-visible + .pp-01__btn {
+  box-shadow: 0 0 0 3px var(--ink-panel), 0 0 0 6px var(--amber);
+}
+
+/* Until the player reports ready, the toggle would silently do nothing. */
+.pp-01__chk:disabled + .pp-01__btn {
+  background: var(--amber-dim);
+  opacity: 0.45;
   cursor: not-allowed;
-  opacity: 0.6;
+}
+
+.pp-01__chk:disabled + .pp-01__btn:hover,
+.pp-01__chk:disabled + .pp-01__btn:active {
+  transform: none;
+}
+
+.pp-01__bars {
+  display: flex;
+  gap: 0;
+  width: 26px;
+  height: 29px;
+  transform: translateX(2px);
+  transition: gap 0.42s cubic-bezier(0.65, 0, 0.35, 1), transform 0.42s cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+.pp-01__bars i {
+  flex: 1;
+  background: currentColor;
+  transition: clip-path 0.42s cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+.pp-01__bars i:nth-child(1) {
+  clip-path: polygon(0 0, 100% 25%, 100% 75%, 0 100%);
+}
+
+.pp-01__bars i:nth-child(2) {
+  clip-path: polygon(0 25%, 100% 50%, 100% 50%, 0 75%);
+}
+
+.pp-01__chk:checked + .pp-01__btn .pp-01__bars {
+  gap: 8px;
+  transform: translateX(0);
+}
+
+.pp-01__chk:checked + .pp-01__btn .pp-01__bars i {
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pp-01__btn,
+  .pp-01__bars,
+  .pp-01__bars i {
+    transition-duration: 0.01ms;
+  }
 }
 
 .console__image-placeholder {
@@ -345,4 +497,80 @@ body {
 .console__image-credit:hover {
   color: var(--amber);
   text-decoration: underline;
+}
+
+/* Pickable result list under the player. Clicking an item swaps the video
+   shown in .console__video-frame. */
+.console__video-list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.console__video-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  background: #10121a;
+  border: 1px solid var(--ink-line);
+  border-radius: 8px;
+  padding: 6px;
+  color: var(--paper);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.console__video-item:hover {
+  border-color: var(--amber-dim);
+}
+
+.console__video-item.is-selected {
+  border-color: var(--amber);
+  background: #171a22;
+}
+
+.console__video-item:focus-visible {
+  outline: none;
+  border-color: var(--amber);
+  box-shadow: 0 0 0 2px rgba(232, 163, 61, 0.35);
+}
+
+.console__video-thumb {
+  width: 72px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 4px;
+  flex-shrink: 0;
+  background: #0e1016;
+}
+
+.console__video-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.console__video-title {
+  font-size: 12.5px;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.console__video-author {
+  font-size: 11px;
+  color: var(--text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
