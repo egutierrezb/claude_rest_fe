@@ -8,6 +8,12 @@ const API_URL = '/api/ask'
 // The backend does the YouTube search (no API key) so the browser never hits
 // CORS or a flaky public search instance.
 const VIDEO_API_URL = '/api/video'
+// GET /api/posts?q=<car model> -> { posts: [{ id, text, createdAt }, ...] }.
+// The backend queries the X API for @tucoche_'s recent posts about the model,
+// so the browser never handles the X bearer token.
+const POSTS_API_URL = '/api/posts'
+// The X account whose posts the panel shows; used only for display and links.
+const X_ACCOUNT = 'tucoche_'
 
 // Read-only prefix the user's car model is appended to, both for the prompt
 // sent to Claude and for the sentence shown in the form.
@@ -48,6 +54,25 @@ function YoutubeIcon({ className }) {
            viewBox="0 0 16 16">
         <path
             d="M8.051 1.999h.089c.822.003 4.987.033 6.11.335a2.01 2.01 0 0 1 1.415 1.42c.101.38.172.883.22 1.402l.01.104.022.26.008.104c.065.914.073 1.77.074 1.957v.075c-.001.194-.01 1.108-.082 2.06l-.008.105-.009.104c-.05.572-.124 1.14-.235 1.558a2.01 2.01 0 0 1-1.415 1.42c-1.16.312-5.569.334-6.18.335h-.142c-.309 0-1.587-.006-2.927-.052l-.17-.006-.087-.004-.171-.007-.171-.007c-1.11-.049-2.167-.128-2.654-.26a2.01 2.01 0 0 1-1.415-1.419c-.111-.417-.185-.986-.235-1.558L.09 9.82l-.008-.104A31 31 0 0 1 0 7.68v-.123c.002-.215.01-.958.064-1.778l.007-.103.003-.052.008-.104.022-.26.01-.104c.048-.519.119-1.023.22-1.402a2.01 2.01 0 0 1 1.415-1.42c.487-.13 1.544-.21 2.654-.26l.17-.007.172-.006.086-.003.171-.007A100 100 0 0 1 7.858 2zM6.4 5.209v4.818l4.157-2.408z"/>
+      </svg>
+  )
+}
+
+// The X (formerly Twitter) wordmark glyph, drawn inline so we don't embed a
+// third-party brand asset. fill="currentColor" so it takes the label color.
+function XIcon({ className }) {
+  return (
+      <svg
+          className={className}
+          xmlns="http://www.w3.org/2000/svg"
+          width="16"
+          height="16"
+          fill="currentColor"
+          viewBox="0 0 16 16"
+          role="img"
+          aria-hidden="true"
+      >
+        <path d="M12.6.75h2.454l-5.36 6.142L16 15.25h-4.937l-3.867-5.07-4.425 5.07H.316l5.733-6.57L0 .75h5.063l3.495 4.633L12.6.75Zm-.86 13.028h1.36L4.323 2.145H2.865l8.875 11.633Z" />
       </svg>
   )
 }
@@ -192,6 +217,10 @@ export default function App() {
   const [videosLoading, setVideosLoading] = useState(false)
   const [videosError, setVideosError] = useState('')
 
+  const [posts, setPosts] = useState([])           // [{ id, text, createdAt }] from @tucoche_
+  const [postsLoading, setPostsLoading] = useState(false)
+  const [postsError, setPostsError] = useState('')
+
   async function fetchAnswer(trimmedQuestion) {
     setLoading(true)
     setError('')
@@ -248,15 +277,39 @@ export default function App() {
     }
   }
 
+  async function fetchPosts(carModel) {
+    setPostsLoading(true)
+    setPostsError('')
+    setPosts([])
+
+    try {
+      const response = await fetch(`${POSTS_API_URL}?q=${encodeURIComponent(carModel)}`)
+      const data = await response.json()
+
+      if (!response.ok || !Array.isArray(data.posts)) {
+        console.log('Exception response not ok',response.body)
+        throw new Error(data.error || `Request failed (${response.status})`)
+      }
+
+      setPosts(data.posts)
+    } catch (err) {
+      console.log('Exception: ',err)
+      setPostsError('No se pudieron cargar los posts de X para este modelo.')
+    } finally {
+      setPostsLoading(false)
+    }
+  }
+
   function handleSubmit(e) {
     e.preventDefault()
     const trimmed = model.trim()
     if (!trimmed || loading) return
 
-    // Fired independently: a slow/failed video lookup never blocks or
+    // Fired independently: a slow/failed video or X lookup never blocks or
     // breaks the actual Claude answer.
     fetchAnswer(`${QUESTION_PREFIX} ${trimmed}`)
     fetchVideos(trimmed, count)
+    fetchPosts(trimmed)
   }
 
   return (
@@ -370,7 +423,69 @@ export default function App() {
                   </div>
               )}
 
-              {!videosLoading && !videosError && videos.length > 0 && (
+            </div>
+
+            {/* Third cell in the 2-col grid, so it sits bottom-left, under RESPONSE
+                and level with the video list that follows it in the fourth cell. */}
+            <div className="console__posts-block">
+              <span className="console__label console__label--with-icon">
+                <XIcon className="console__x-icon" />
+                POSTS FROM @{X_ACCOUNT.toUpperCase()}
+              </span>
+
+              <div className="console__posts-wrap">
+                {postsLoading && (
+                    <div className="console__posts-status">
+                      <span className="spinner" aria-hidden="true" />
+                      <span>Buscando posts…</span>
+                    </div>
+                )}
+
+                {!postsLoading && postsError && (
+                    <div className="console__posts-status console__posts-status--error">
+                      {postsError}
+                    </div>
+                )}
+
+                {!postsLoading && !postsError && posts.length === 0 && (
+                    <div className="console__posts-status">
+                      Los posts de X aparecerán aquí.
+                    </div>
+                )}
+
+                {!postsLoading && !postsError && posts.length > 0 && (
+                    <ul className="console__posts-list">
+                      {posts.map((p) => (
+                          <li key={p.id}>
+                            <a
+                                className="console__post"
+                                href={`https://x.com/${X_ACCOUNT}/status/${p.id}`}
+                                target="_blank"
+                                rel="noreferrer"
+                            >
+                              <span className="console__post-text">{p.text}</span>
+                              {p.createdAt && (
+                                  <span className="console__post-date">
+                                    {new Date(p.createdAt).toLocaleDateString()}
+                                  </span>
+                              )}
+                            </a>
+                          </li>
+                      ))}
+                    </ul>
+                )}
+              </div>
+            </div>
+
+            {/* Fourth cell: bottom-right. Auto-placement puts it in the same grid row
+                as the posts panel, which is what keeps the two lists level. */}
+            {!videosLoading && !videosError && videos.length > 0 && (
+                <div className="console__video-list-block">
+                  <span className="console__label console__label--with-icon">
+                    <YoutubeIcon className="console__youtube-icon" />
+                    VIDEO RESULTS
+                  </span>
+
                   <ul className="console__video-list">
                     {videos.map((v, i) => (
                         <li key={v.id}>
@@ -399,8 +514,8 @@ export default function App() {
                         </li>
                     ))}
                   </ul>
-              )}
-            </div>
+                </div>
+            )}
           </div>
         </div>
       </div>

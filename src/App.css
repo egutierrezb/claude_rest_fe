@@ -106,9 +106,21 @@ body {
   .console__body {
     grid-template-columns: 1fr;
   }
+
+  /* Stacked, there are no columns left to align, and the DOM order that pairs
+     the panels side by side would strand the video list below the posts,
+     away from the player it drives. Push the posts panel last instead. */
+  .console__posts-block {
+    order: 1;
+  }
 }
 
+/* min-height matches the 16px icons, so a label with an icon and one without
+   are the same height and the boxes beneath them start on the same line. */
 .console__label {
+  display: flex;
+  align-items: center;
+  min-height: 16px;
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
@@ -117,8 +129,6 @@ body {
 }
 
 .console__label--with-icon {
-  display: flex;
-  align-items: center;
   gap: 6px;
 }
 
@@ -206,7 +216,7 @@ body {
   border: 1px solid var(--ink-line);
   border-radius: 6px;
   color: var(--paper);
-  font-family: 'IBM Plex Mono', 'SFMono-Regular', monospace;
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
   font-size: 13px;
   padding: 6px 8px;
   cursor: pointer;
@@ -266,8 +276,9 @@ body {
   border-radius: 8px;
   padding: 14px 16px;
   color: var(--paper);
-  font-family: 'IBM Plex Mono', 'SFMono-Regular', monospace;
-  font-size: 13.5px;
+  /* Same family as the rest of the console; only the state colors change below. */
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 14px;
   line-height: 1.6;
   white-space: pre-wrap;
   cursor: text;
@@ -276,17 +287,14 @@ body {
 .console__output[data-state='empty'] {
   color: #565b6b;
   font-style: italic;
-  font-family: 'IBM Plex Sans', system-ui, sans-serif;
 }
 
 .console__output[data-state='loading'] {
   color: var(--amber);
-  font-family: 'IBM Plex Sans', system-ui, sans-serif;
 }
 
 .console__output[data-state='error'] {
   color: var(--error);
-  font-family: 'IBM Plex Sans', system-ui, sans-serif;
 }
 
 .console__output:focus {
@@ -499,11 +507,22 @@ body {
   text-decoration: underline;
 }
 
-/* Pickable result list under the player. Clicking an item swaps the video
-   shown in .console__video-frame. */
+/* Bottom-right panel, sharing a grid row with .console__posts-block so the two
+   result lists sit at the same height. */
+.console__video-list-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* Pickable result list. Clicking an item swaps the video shown in
+   .console__video-frame, up in the cell above. */
 .console__video-list {
   list-style: none;
-  margin: 4px 0 0;
+  /* No top margin: the parent's 8px flex gap already spaces it off the label,
+     and any extra here would push it below the posts box beside it. */
+  margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
@@ -573,4 +592,88 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Bottom-left panel: recent @tucoche_ posts about the car model. */
+.console__posts-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.console__x-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--amber);
+}
+
+.console__posts-wrap {
+  border: 1px solid var(--ink-line);
+  border-radius: 8px;
+  background: #0e1016;
+  padding: 10px;
+  min-height: 96px;
+}
+
+.console__posts-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 4px;
+  font-size: 13px;
+  font-style: italic;
+  color: #565b6b;
+}
+
+.console__posts-status--error {
+  color: var(--error);
+  font-style: normal;
+}
+
+.console__posts-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.console__post {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: #10121a;
+  border: 1px solid var(--ink-line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--paper);
+  text-decoration: none;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.console__post:hover {
+  border-color: var(--amber-dim);
+  background: #171a22;
+}
+
+.console__post:focus-visible {
+  outline: none;
+  border-color: var(--amber);
+  box-shadow: 0 0 0 2px rgba(232, 163, 61, 0.35);
+}
+
+.console__post-text {
+  font-size: 12.5px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
+.console__post-date {
+  font-size: 11px;
+  color: var(--text-soft);
 }
