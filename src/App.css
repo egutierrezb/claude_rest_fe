@@ -647,17 +647,26 @@ body {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  width: 100%;
+  text-align: left;
   background: #10121a;
   border: 1px solid var(--ink-line);
   border-radius: 8px;
   padding: 8px 10px;
   color: var(--paper);
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
   text-decoration: none;
+  cursor: pointer;
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 
 .console__post:hover {
   border-color: var(--amber-dim);
+  background: #171a22;
+}
+
+.console__post.is-selected {
+  border-color: var(--amber);
   background: #171a22;
 }
 
@@ -673,7 +682,93 @@ body {
   white-space: pre-wrap;
 }
 
+.console__post-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .console__post-date {
   font-size: 11px;
+  color: var(--text-soft);
+}
+
+.console__post-link {
+  font-size: 11px;
+  color: var(--amber);
+  text-decoration: none;
+}
+
+.console__post-link:hover {
+  text-decoration: underline;
+}
+
+.console__post-comment {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.console__post-comment-input {
+  resize: vertical;
+  min-height: 56px;
+  background: #10121a;
+  border: 1px solid var(--ink-line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--paper);
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  transition: border-color 0.15s ease;
+}
+
+.console__post-comment-input:focus {
+  outline: none;
+  border-color: var(--amber-dim);
+}
+
+.console__post-comment-input::placeholder {
+  color: #565b6b;
+}
+
+.console__post-comment-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.console__post-comment-submit {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 16px;
+  border: none;
+  border-radius: 8px;
+  background: var(--amber);
+  color: #1a1206;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.05s ease;
+}
+
+.console__post-comment-submit:hover:not(:disabled) {
+  background: #f0b158;
+}
+
+.console__post-comment-submit:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.console__post-comment-submit:disabled {
+  background: var(--ink-line);
+  color: var(--text-soft);
+  cursor: not-allowed;
+}
+
+.console__post-comment-status {
+  font-size: 12px;
   color: var(--text-soft);
 }
