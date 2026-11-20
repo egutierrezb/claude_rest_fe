@@ -220,6 +220,9 @@ export default function App() {
   const [posts, setPosts] = useState([])           // [{ id, text, createdAt }] from @tucoche_
   const [postsLoading, setPostsLoading] = useState(false)
   const [postsError, setPostsError] = useState('')
+  const [selectedPostId, setSelectedPostId] = useState(null) // which post the comment box targets
+  const [postComments, setPostComments] = useState({})       // { [postId]: draft comment text }
+  const [submittedPostId, setSubmittedPostId] = useState(null) // id whose reply was just submitted
 
   async function fetchAnswer(trimmedQuestion) {
     setLoading(true)
@@ -281,6 +284,9 @@ export default function App() {
     setPostsLoading(true)
     setPostsError('')
     setPosts([])
+    setSelectedPostId(null)
+    setPostComments({})
+    setSubmittedPostId(null)
 
     try {
       const response = await fetch(`${POSTS_API_URL}?q=${encodeURIComponent(carModel)}`)
@@ -298,6 +304,13 @@ export default function App() {
     } finally {
       setPostsLoading(false)
     }
+  }
+
+  // Frontend-only for now: there's no backend endpoint yet to actually post
+  // the reply to X, so this just confirms the draft locally.
+  function handleReplySubmit() {
+    if (!selectedPostId || !(postComments[selectedPostId] || '').trim()) return
+    setSubmittedPostId(selectedPostId)
   }
 
   function handleSubmit(e) {
@@ -457,22 +470,69 @@ export default function App() {
                     <ul className="console__posts-list">
                       {posts.map((p) => (
                           <li key={p.id}>
-                            <a
-                                className="console__post"
-                                href={`https://x.com/${X_ACCOUNT}/status/${p.id}`}
-                                target="_blank"
-                                rel="noreferrer"
+                            <button
+                                type="button"
+                                className={
+                                  'console__post' +
+                                  (p.id === selectedPostId ? ' is-selected' : '')
+                                }
+                                onClick={() => setSelectedPostId(p.id)}
+                                aria-pressed={p.id === selectedPostId}
                             >
                               <span className="console__post-text">{p.text}</span>
-                              {p.createdAt && (
-                                  <span className="console__post-date">
-                                    {new Date(p.createdAt).toLocaleDateString()}
-                                  </span>
-                              )}
-                            </a>
+                              <span className="console__post-meta">
+                                {p.createdAt && (
+                                    <span className="console__post-date">
+                                      {new Date(p.createdAt).toLocaleDateString()}
+                                    </span>
+                                )}
+                                <a
+                                    className="console__post-link"
+                                    href={`https://x.com/${X_ACCOUNT}/status/${p.id}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                  Ver en X ↗
+                                </a>
+                              </span>
+                            </button>
                           </li>
                       ))}
                     </ul>
+                )}
+
+                {!postsLoading && !postsError && selectedPostId && (
+                    <div className="console__post-comment">
+                      <label className="console__label" htmlFor="post-comment">
+                        REPLY
+                      </label>
+                      <textarea
+                          id="post-comment"
+                          className="console__post-comment-input"
+                          placeholder="Escribe un comentario para este post…"
+                          value={postComments[selectedPostId] || ''}
+                          onChange={(e) => {
+                            const value = e.target.value
+                            setPostComments((prev) => ({ ...prev, [selectedPostId]: value }))
+                            setSubmittedPostId((prev) => (prev === selectedPostId ? null : prev))
+                          }}
+                          rows={3}
+                      />
+                      <div className="console__post-comment-actions">
+                        <button
+                            type="button"
+                            className="console__post-comment-submit"
+                            onClick={handleReplySubmit}
+                            disabled={!(postComments[selectedPostId] || '').trim()}
+                        >
+                          Reply
+                        </button>
+                        {submittedPostId === selectedPostId && (
+                            <span className="console__post-comment-status">Respuesta enviada.</span>
+                        )}
+                      </div>
+                    </div>
                 )}
               </div>
             </div>
