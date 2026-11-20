@@ -258,7 +258,7 @@ export default function App() {
 
     try {
       const response = await fetch(
-          `${VIDEO_API_URL}?q=${encodeURIComponent(`${carModel} review`)}&count=${howMany}`,
+          `${VIDEO_API_URL}?q=${encodeURIComponent(carModel)}&count=${howMany}`,
       )
       const data = await response.json()
 
